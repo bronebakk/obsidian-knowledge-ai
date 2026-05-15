@@ -52,6 +52,8 @@ export function SettingsView() {
   // Provider form state
   const [providerDraft, setProviderDraft] = useState({
     displayName: '', baseUrl: '', apiKey: '', defaultModel: '', timeoutMs: 30000,
+    // 0 = 未填(使用 GenerationService 内置 128K 默认值)。32K/64K/128K 是常见值。
+    maxContextTokens: 0,
     supportsEmbeddings: false,
     supportsVision: false,
   });
@@ -80,11 +82,14 @@ export function SettingsView() {
         supportsTemperature: true,
         supportsMaxTokens: true,
         maxTokensFieldName: 'max_tokens',
+        ...(providerDraft.maxContextTokens > 0
+          ? { maxContextTokens: providerDraft.maxContextTokens }
+          : {}),
         supportsEmbeddings: providerDraft.supportsEmbeddings,
         supportsVision: providerDraft.supportsVision,
       },
     });
-    setProviderDraft({ displayName: '', baseUrl: '', apiKey: '', defaultModel: '', timeoutMs: 30000, supportsEmbeddings: false, supportsVision: false });
+    setProviderDraft({ displayName: '', baseUrl: '', apiKey: '', defaultModel: '', timeoutMs: 30000, maxContextTokens: 0, supportsEmbeddings: false, supportsVision: false });
     setShowProviderForm(false);
   };
 
@@ -96,6 +101,7 @@ export function SettingsView() {
       apiKey: p.apiKey,
       defaultModel: p.defaultModel,
       timeoutMs: p.timeoutMs,
+      maxContextTokens: p.capabilities.maxContextTokens ?? 0,
       supportsEmbeddings: p.capabilities.supportsEmbeddings ?? false,
       supportsVision: p.capabilities.supportsVision ?? false,
     });
@@ -104,6 +110,16 @@ export function SettingsView() {
 
   const handleUpdateProvider = async () => {
     if (!editingProvider) return;
+    const nextCaps: typeof editingProvider.capabilities = {
+      ...editingProvider.capabilities,
+      supportsEmbeddings: providerDraft.supportsEmbeddings,
+      supportsVision: providerDraft.supportsVision,
+    };
+    if (providerDraft.maxContextTokens > 0) {
+      nextCaps.maxContextTokens = providerDraft.maxContextTokens;
+    } else {
+      delete nextCaps.maxContextTokens;
+    }
     const updated: Provider = {
       ...editingProvider,
       displayName: providerDraft.displayName,
@@ -111,7 +127,7 @@ export function SettingsView() {
       apiKey: providerDraft.apiKey,
       defaultModel: providerDraft.defaultModel,
       timeoutMs: providerDraft.timeoutMs,
-      capabilities: { ...editingProvider.capabilities, supportsEmbeddings: providerDraft.supportsEmbeddings, supportsVision: providerDraft.supportsVision },
+      capabilities: nextCaps,
       updatedAt: Date.now(),
     };
     await services.updateProvider(updated);
@@ -253,6 +269,21 @@ export function SettingsView() {
             <div style={{ marginBottom: '8px' }}>
               <label>{t('settings.providers.timeoutMs')}</label>
               <input type="number" value={providerDraft.timeoutMs} onChange={e => setProviderDraft(d => ({ ...d, timeoutMs: Number(e.target.value) }))} style={{ width: '100%' }} />
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <label>{t('settings.providers.maxContextTokens')}</label>
+              <input
+                type="number"
+                min={0}
+                step={1024}
+                placeholder="0"
+                value={providerDraft.maxContextTokens || ''}
+                onChange={e => setProviderDraft(d => ({ ...d, maxContextTokens: Math.max(0, Number(e.target.value) || 0) }))}
+                style={{ width: '100%' }}
+              />
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {t('settings.providers.maxContextTokensDesc')}
+              </div>
             </div>
             <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input

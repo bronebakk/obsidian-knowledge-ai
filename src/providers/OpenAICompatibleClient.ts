@@ -1,4 +1,5 @@
 import type { LLMClient, ChatOptions, ProviderCapabilities, TokenUsage, StreamEvent } from './types';
+import { TokenLimitError, isTokenLimitMessage, parseTokenLimitNumbers } from './errors';
 import { parseSSEStream } from './sseParser';
 
 interface ProviderConfig {
@@ -94,6 +95,10 @@ export class OpenAICompatibleClient implements LLMClient {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
+      if (res.status === 400 && isTokenLimitMessage(text)) {
+        const { modelLimit, requested } = parseTokenLimitNumbers(text);
+        throw new TokenLimitError(text.slice(0, 300), modelLimit, requested);
+      }
       throw new Error(`HTTP ${res.status}: ${text.slice(0, 120)}`);
     }
     return res;

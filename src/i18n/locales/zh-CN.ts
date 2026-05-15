@@ -62,6 +62,8 @@ const zhCN: Record<string, string> = {
   'settings.providers.apiKey': 'API Key',
   'settings.providers.defaultModel': '默认模型',
   'settings.providers.timeoutMs': '超时(毫秒)',
+  'settings.providers.maxContextTokens': '上下文窗口(token)',
+  'settings.providers.maxContextTokensDesc': '此模型最大输入+输出 token 总量。留 0 使用 128K 默认值。常见值:deepseek-chat / moonshot-v1-32k 填 32000;moonshot-v1-64k 填 64000;kimi-k2 / deepseek-v3 / qwen-max 填 128000。',
   'settings.providers.supportsEmbeddings': '支持 embedding',
   'settings.providers.supportsEmbeddingsDesc': '勾选后此 provider 会出现在向量检索的来源列表中。',
   'settings.providers.supportsVision': '支持 vision',

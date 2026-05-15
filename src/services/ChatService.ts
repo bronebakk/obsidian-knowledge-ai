@@ -6,6 +6,7 @@ import type { HashCacheStore } from 'src/indexer/hashCache';
 import type { Clock } from 'src/infra/clock';
 import type { Logger } from 'src/infra/logger';
 import type { ChatMessage, LLMClient } from 'src/providers/types';
+import { TokenLimitError, friendlyTokenLimitMessage } from 'src/providers/errors';
 
 // Modern long-context models (GPT-4o/Claude/Qwen2.5/DeepSeek-V3) all have
 // 32k–128k input windows. 12k was a leftover from older models and capped
@@ -87,6 +88,8 @@ export class ChatService {
     const turnId = crypto.randomUUID();
     let accContent = '';
     let citations: Citation[] = [];
+    // hoist 到 try 外:catch 块需要 model 名生成 friendly 错误提示
+    let resolvedModel: string | undefined;
 
     try {
       yield { type: 'retrieving' };
@@ -164,6 +167,7 @@ export class ChatService {
         yield { type: 'error', error: '未配置 chat 任务的模型;请到设置页指派' };
         return;
       }
+      resolvedModel = resolved.model;
 
       yield { type: 'generating' };
 
@@ -196,6 +200,12 @@ export class ChatService {
       yield { type: 'done', turn };
 
     } catch (e) {
+      if (e instanceof TokenLimitError) {
+        const friendly = friendlyTokenLimitMessage(e, resolvedModel);
+        this.deps.logger?.warn(`ChatService.ask token-limit: ${e.raw}`);
+        yield { type: 'error', error: friendly };
+        return;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       this.deps.logger?.warn(`ChatService.ask failed: ${msg}`);
       yield { type: 'error', error: msg };

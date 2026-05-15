@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GenerationService, type ResolvedTaskClient } from 'src/services/GenerationService';
+import { TokenLimitError } from 'src/providers/errors';
 import type { HashCacheStore } from 'src/indexer/hashCache';
 import type { PathMapStore } from 'src/indexer/pathMap';
 import { makeFakeClock } from 'src/infra/clock';
@@ -86,13 +87,16 @@ interface FakeStreamScript {
   throw?: Error;
 }
 
-function makeFakeLLM(script: FakeStreamScript = {}): {
+function makeFakeLLM(
+  script: FakeStreamScript = {},
+  capsOverride?: Partial<ProviderCapabilities>,
+): {
   client: LLMClient;
   capturedMessages: ChatMessage[][];
 } {
   const captured: ChatMessage[][] = [];
   const client: LLMClient = {
-    capabilities: CAPS,
+    capabilities: { ...CAPS, ...capsOverride },
     async chat() {
       return { content: '' };
     },
@@ -199,6 +203,41 @@ describe('GenerationService', () => {
     const errs = events.filter(e => e.type === 'error');
     expect(errs).toHaveLength(1);
     expect(errs[0].type === 'error' && errs[0].error).toMatch(/未配置/);
+    expect(events.some(e => e.type === 'done')).toBe(false);
+  });
+
+  it('translates TokenLimitError into actionable Chinese error mentioning model + limit', async () => {
+    const chunks = [mkChunk('hA:0', 'alpha', { fileHash: 'hA' })];
+    const pathMap = mkPathMapStub([
+      { filePath: 'notes/a.md', fileHash: 'hA', sourceMtime: 1, observedAt: 1 },
+    ]);
+    const hashCache = mkHashCacheStub(new Map([['hA', mkOkEntry('hA', chunks)]]));
+    const tokenErr = new TokenLimitError(
+      'Your request exceeded model token limit: 32768 (requested: 57337)',
+      32768,
+      57337,
+    );
+    const { client } = makeFakeLLM({ throw: tokenErr });
+    const svc = new GenerationService({
+      hashCache,
+      pathMap,
+      getNotebook: async () => mkNotebook('nb1'),
+      resolveTaskClient: (): ResolvedTaskClient => ({ client, model: 'moonshot-v1-32k' }),
+      clock: makeFakeClock(1),
+      logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), setLevel: vi.fn() },
+    });
+    const events = await collect(svc.generate('nb1', 'summary'));
+    const errs = events.filter(e => e.type === 'error');
+    expect(errs).toHaveLength(1);
+    if (errs[0].type === 'error') {
+      const msg = errs[0].error;
+      expect(msg).toContain('moonshot-v1-32k');
+      expect(msg).toContain('32768');
+      expect(msg).toContain('57337');
+      expect(msg).toContain('Context window');
+      // 必须给出可执行建议(换模型 / 调设置),而不是 raw HTTP 400
+      expect(msg).not.toContain('HTTP 400');
+    }
     expect(events.some(e => e.type === 'done')).toBe(false);
   });
 
@@ -342,8 +381,8 @@ describe('GenerationService', () => {
     }
   });
 
-  it('buildCitationsAndBudget truncates when total tokens exceed MAX_GENERATION_TOKENS', async () => {
-    // 第一个 chunk 小,第二个超大(超 200K),应在 i=1 break,truncated=true
+  it('buildCitationsAndBudget truncates when total tokens exceed budget (default 128K context)', async () => {
+    // 第一个 chunk 小,第二个超大(超默认 128K budget),应在 i=1 break,truncated=true
     const big = mkChunk('hB:0', 'big', { fileHash: 'hB', filePath: 'notes/b.md', tokenCount: 300_000 });
     const small1 = mkChunk('hA:0', 'small one', { fileHash: 'hA', filePath: 'notes/a.md', tokenCount: 10 });
     const small3 = mkChunk('hC:0', 'should-be-dropped', { fileHash: 'hC', filePath: 'notes/c.md', tokenCount: 10 });
@@ -382,6 +421,38 @@ describe('GenerationService', () => {
     const done = events.find(e => e.type === 'done');
     if (done && done.type === 'done') {
       expect(done.artifact.truncated).toBe(true);
+    }
+  });
+
+  it('respects provider.capabilities.maxContextTokens: small window truncates mid-size chunks', async () => {
+    // 32K 上下文窗口的模型(deepseek-chat / moonshot-v1-32k 等):
+    // budget = 32_000 - 12_000(output) - 2_000(system reserve) = 18_000
+    // 第一个 5K chunk 留下,第二个 20K chunk 超过剩余 budget → truncate
+    const a = mkChunk('hA:0', 'small', { fileHash: 'hA', filePath: 'notes/a.md', tokenCount: 5_000 });
+    const b = mkChunk('hB:0', 'medium-big', { fileHash: 'hB', filePath: 'notes/b.md', tokenCount: 20_000 });
+    const pathMap = mkPathMapStub([
+      { filePath: 'notes/a.md', fileHash: 'hA', sourceMtime: 1, observedAt: 1 },
+      { filePath: 'notes/b.md', fileHash: 'hB', sourceMtime: 1, observedAt: 1 },
+    ]);
+    const hashCache = mkHashCacheStub(new Map([
+      ['hA', mkOkEntry('hA', [a])],
+      ['hB', mkOkEntry('hB', [b])],
+    ]));
+    const { client } = makeFakeLLM({ deltas: ['ok'] }, { maxContextTokens: 32_000 });
+    const svc = new GenerationService({
+      hashCache,
+      pathMap,
+      getNotebook: async () => mkNotebook('nb1'),
+      resolveTaskClient: (): ResolvedTaskClient => ({ client, model: 'm-small' }),
+      clock: makeFakeClock(1),
+    });
+    const events = await collect(svc.generate('nb1', 'summary'));
+    const cit = events.find(e => e.type === 'citations');
+    expect(cit && cit.type === 'citations').toBe(true);
+    if (cit && cit.type === 'citations') {
+      expect(cit.truncated).toBe(true);
+      expect(cit.citations).toHaveLength(1);
+      expect(cit.citations[0].chunkId).toBe('hA:0');
     }
   });
 

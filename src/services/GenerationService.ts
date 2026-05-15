@@ -12,17 +12,31 @@ import type { Clock } from 'src/infra/clock';
 import type { Logger } from 'src/infra/logger';
 import type { LLMClient, ChatMessage } from 'src/providers/types';
 import { matchesNotebookScope } from 'src/indexer/scope';
+import type { ProviderCapabilities } from 'src/providers/types';
+import { TokenLimitError, friendlyTokenLimitMessage } from 'src/providers/errors';
 import { CHUNKING_VERSION } from 'src/chunking/types';
 import { GENERATORS } from 'src/generation/generators';
 
-// 资料预算:覆盖典型 vault 全量。主流大模型 context 普遍 128K-256K
-// (K2.6=128K, deepseek-v3=128K, qwen-max-latest=131K, moonshot-v1-128k/256k),
-// 留出 ~30K 给 system prompt + reasoning + output。
-// 这里设 200K 是为多数 vault 一次喂完,只有真正超大库(>= 1000 长 chunk)才触发截断。
-const MAX_GENERATION_TOKENS = 200000;
+// Provider 未填 maxContextTokens 时的乐观默认值。覆盖 deepseek-v3/kimi-k2/qwen-max 等
+// 主流 128K 模型;小窗口模型(deepseek-chat 32K / moonshot-v1-32k 等)用户必须在
+// Provider 设置里手动填 maxContextTokens,否则会撞 400 token limit。
+const DEFAULT_MAX_CONTEXT_TOKENS = 128_000;
 // 输出预算:reasoning model(K2.x / R1 / o1)在 reasoning_content 上消耗 4-8k token
 // 是常态,留足 12K 才能保证最终 content 不被截断为空(timeline 实测踩过这个坑)。
-const ASSISTANT_MAX_TOKENS = 12000;
+const ASSISTANT_MAX_TOKENS = 12_000;
+// system prompt(generator 提示词 + "== 资料 ==" 标头 + 每个 chunk 的 [N] meta 行)
+// 经验值 ~2K,真实占用因 generator 而异。保守留 2K 避免 generator 长 prompt 把
+// 上下文挤出窗口。
+const SYSTEM_PROMPT_RESERVE = 2_000;
+// budget 计算结果的下限,防止小窗口模型(< 14K)算出负数或过小值。1K 至少能塞下
+// 一个 chunk + 截断标记,让生成路径不至于完全失败。
+const MIN_GENERATION_BUDGET = 1_000;
+
+function computeGenerationBudget(caps: ProviderCapabilities): number {
+  const ctx = caps.maxContextTokens ?? DEFAULT_MAX_CONTEXT_TOKENS;
+  const budget = ctx - ASSISTANT_MAX_TOKENS - SYSTEM_PROMPT_RESERVE;
+  return Math.max(budget, MIN_GENERATION_BUDGET);
+}
 
 export interface ResolvedTaskClient {
   client: LLMClient;
@@ -50,6 +64,8 @@ export class GenerationService {
     const { signal, title } = opts;
     let accContent = '';
     const config = GENERATORS[kind];
+    // hoist 到 try 外:catch 块需要 model 名生成 friendly 错误提示
+    let resolvedModel: string | undefined;
 
     try {
       yield { type: 'retrieving' };
@@ -66,14 +82,16 @@ export class GenerationService {
         return;
       }
 
-      const { citations, includedChunks, truncated } = this.buildCitationsAndBudget(chunks);
-      yield { type: 'citations', citations, truncated };
-
       const resolved = this.deps.resolveTaskClient();
       if (!resolved) {
         yield { type: 'error', error: '未配置 summary 任务的模型;请到设置页指派' };
         return;
       }
+      resolvedModel = resolved.model;
+
+      const budget = computeGenerationBudget(resolved.client.capabilities);
+      const { citations, includedChunks, truncated } = this.buildCitationsAndBudget(chunks, budget);
+      yield { type: 'citations', citations, truncated };
 
       const messages = this.buildMessages(config.systemPrompt, citations, includedChunks);
 
@@ -120,6 +138,12 @@ export class GenerationService {
         yield { type: 'error', error: '已取消' };
         return;
       }
+      if (e instanceof TokenLimitError) {
+        const friendly = friendlyTokenLimitMessage(e, resolvedModel);
+        this.deps.logger?.warn(`GenerationService.generate(${kind}) token-limit: ${e.raw}`);
+        yield { type: 'error', error: friendly };
+        return;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       this.deps.logger?.warn(`GenerationService.generate(${kind}) failed: ${msg}`);
       yield { type: 'error', error: msg };
@@ -146,14 +170,14 @@ export class GenerationService {
     );
   }
 
-  private buildCitationsAndBudget(allChunks: Chunk[]): {
+  private buildCitationsAndBudget(allChunks: Chunk[], maxTokens: number): {
     citations: Citation[];
     includedChunks: Chunk[];
     truncated: boolean;
   } {
     const citations: Citation[] = [];
     const included: Chunk[] = [];
-    let budget = MAX_GENERATION_TOKENS;
+    let budget = maxTokens;
     let truncated = false;
     for (let i = 0; i < allChunks.length; i++) {
       const chunk = allChunks[i];

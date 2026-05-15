@@ -64,6 +64,8 @@ const en: Record<string, string> = {
   'settings.providers.apiKey': 'API key',
   'settings.providers.defaultModel': 'Default model',
   'settings.providers.timeoutMs': 'Timeout (ms)',
+  'settings.providers.maxContextTokens': 'Context window (tokens)',
+  'settings.providers.maxContextTokensDesc': 'Maximum input + output tokens this model accepts. Leave 0 to use the 128K default. Set 32000 for deepseek-chat / moonshot-v1-32k, 64000 for moonshot-v1-64k, 128000 for kimi-k2 / deepseek-v3 / qwen-max.',
   'settings.providers.supportsEmbeddings': 'Supports embeddings',
   'settings.providers.supportsEmbeddingsDesc': 'Tick to make this provider available as an embedding source.',
   'settings.providers.supportsVision': 'Supports vision',
