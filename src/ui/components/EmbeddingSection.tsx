@@ -1,6 +1,10 @@
 import React from 'react';
-import type { EmbeddingConfig, Provider } from 'src/types/data';
+import type { EmbeddingConfig } from 'src/types/data';
 import { t } from 'src/i18n';
+
+const OPENROUTER_EMBEDDING_PRESETS = [
+  { id: 'mistralai/mistral-embed', label: 'Mistral Embed (default, $0.10 / 1M tokens)' },
+];
 
 export interface VectorCoverage {
   total: number;
@@ -11,7 +15,6 @@ export interface VectorCoverage {
 
 export interface EmbeddingSectionProps {
   config: EmbeddingConfig;
-  providers: Provider[];
   coverage: VectorCoverage | null;
   modelDownloadState: 'not-downloaded' | 'downloading' | 'ready' | 'error';
   downloadProgress: number;   // 0-100
@@ -27,11 +30,9 @@ const PRESET_MODELS = [
 ];
 
 export function EmbeddingSection({
-  config, providers, coverage, modelDownloadState, downloadProgress, downloadError,
+  config, coverage, modelDownloadState, downloadProgress, downloadError,
   onConfigChange, onDownloadModel, onTriggerReindex,
 }: EmbeddingSectionProps) {
-  const embeddingProviders = providers.filter(p => p.capabilities?.supportsEmbeddings);
-
   const coverageLabel = (() => {
     if (!config.enabled) return t('settings.vector.coverageNotEnabled');
     if (!coverage) return t('common.loading');
@@ -72,46 +73,73 @@ export function EmbeddingSection({
             <div className="setting-item-control">
               <select
                 value={config.source}
-                onChange={e => onConfigChange({ source: e.target.value as 'api' | 'local' })}
+                onChange={e => onConfigChange({ source: e.target.value as 'openrouter' | 'local' })}
               >
                 <option value="local">{t('settings.vector.source.local')}</option>
-                <option value="api">{t('settings.vector.source.api')}</option>
+                <option value="openrouter">{t('settings.vector.source.openrouter')}</option>
               </select>
             </div>
           </div>
 
-          {config.source === 'api' && (
+          {config.source === 'openrouter' && (
             <>
               <div className="setting-item">
                 <div className="setting-item-info">
-                  <div className="setting-item-name">{t('settings.vector.provider')}</div>
-                  <div className="setting-item-description">{t('settings.vector.providerDesc')}</div>
+                  <div className="setting-item-name">{t('settings.vector.openrouterApiKey')}</div>
+                  <div className="setting-item-description">{t('settings.vector.openrouterApiKeyDesc')}</div>
                 </div>
                 <div className="setting-item-control">
-                  <select
-                    value={config.apiProviderId ?? ''}
-                    onChange={e => onConfigChange({ apiProviderId: e.target.value })}
-                  >
-                    <option value="">{t('settings.vector.providerEmpty')}</option>
-                    {embeddingProviders.map(p => (
-                      <option key={p.id} value={p.id}>{p.displayName}</option>
-                    ))}
-                  </select>
+                  <input
+                    type="password"
+                    placeholder="sk-or-…"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={config.openrouterApiKey ?? ''}
+                    onChange={e => onConfigChange({ openrouterApiKey: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="setting-item">
                 <div className="setting-item-info">
-                  <div className="setting-item-name">{t('settings.vector.apiModel')}</div>
+                  <div className="setting-item-name">{t('settings.vector.openrouterModel')}</div>
                 </div>
                 <div className="setting-item-control">
-                  <input
-                    type="text"
-                    placeholder="text-embedding-3-small"
-                    value={config.apiModel ?? ''}
-                    onChange={e => onConfigChange({ apiModel: e.target.value })}
-                  />
+                  <select
+                    value={
+                      OPENROUTER_EMBEDDING_PRESETS.some(m => m.id === config.openrouterModel)
+                        ? config.openrouterModel
+                        : '__custom__'
+                    }
+                    onChange={e => {
+                      if (e.target.value === '__custom__') {
+                        onConfigChange({ openrouterModel: '' });
+                      } else {
+                        onConfigChange({ openrouterModel: e.target.value });
+                      }
+                    }}
+                  >
+                    {OPENROUTER_EMBEDDING_PRESETS.map(m => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                    <option value="__custom__">{t('settings.vector.openrouterModelCustom')}</option>
+                  </select>
                 </div>
               </div>
+              {!OPENROUTER_EMBEDDING_PRESETS.some(m => m.id === config.openrouterModel) && (
+                <div className="setting-item">
+                  <div className="setting-item-info">
+                    <div className="setting-item-name">{t('settings.vector.openrouterModelCustomLabel')}</div>
+                  </div>
+                  <div className="setting-item-control">
+                    <input
+                      type="text"
+                      placeholder="mistralai/mistral-embed"
+                      value={config.openrouterModel ?? ''}
+                      onChange={e => onConfigChange({ openrouterModel: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
 

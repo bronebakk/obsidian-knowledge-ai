@@ -60,6 +60,17 @@ export class NotebookService implements NotebookStatePort {
     if (!this.pluginData.embeddingConfig) {
       this.pluginData.embeddingConfig = { enabled: false, source: 'local', localModelId: 'Xenova/multilingual-e5-small' };
       migrated = true;
+    } else if ((this.pluginData.embeddingConfig.source as string) === 'api') {
+      // Pre-OpenRouter schema: the legacy generic 'api' source used a provider lookup
+      // (apiProviderId + apiModel). We migrate to 'openrouter' but cannot recover the
+      // API key automatically — fall back to disabled so the user re-configures
+      // explicitly instead of silently hitting the wrong endpoint.
+      this.pluginData.embeddingConfig = {
+        enabled: false,
+        source: 'openrouter',
+        openrouterModel: 'mistralai/mistral-embed',
+      };
+      migrated = true;
     }
     if (!this.pluginData.imageConfig) {
       this.pluginData.imageConfig = {

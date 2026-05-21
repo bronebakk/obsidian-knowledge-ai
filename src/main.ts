@@ -42,7 +42,7 @@ import { CHUNKING_VERSION } from 'src/chunking/types';
 import type { NotebookId, TaskName, TaskAssignment, SearchHit, EmbeddingConfig } from 'src/types/data';
 import { EmbeddingClientRegistry } from 'src/embedding/registry';
 import { EmbeddingWorkerHost } from 'src/embedding/worker/EmbeddingWorkerHost';
-import { APIEmbeddingClient } from 'src/embedding/apiEmbeddingClient';
+import { OpenRouterEmbeddingClient } from 'src/embedding/apiEmbeddingClient';
 import { LocalEmbeddingClient } from 'src/embedding/localEmbeddingClient';
 import { VectorStore } from 'src/embedding/vectorStore';
 import { invalidateAllEmbeddings } from 'src/services/IndexService';
@@ -219,16 +219,11 @@ export default class NotebookAIPlugin extends Plugin {
     const applyEmbeddingConfig = (cfg: EmbeddingConfig) => {
       this.embeddingRegistry.clear();
       if (!cfg.enabled) return;
-      if (cfg.source === 'api' && cfg.apiProviderId && cfg.apiModel) {
-        const provider = pluginData.providers.find(p => p.id === cfg.apiProviderId);
-        if (provider) {
-          this.embeddingRegistry.register(new APIEmbeddingClient({
-            baseUrl: provider.baseUrl,
-            apiKey: provider.apiKey,
-            model: cfg.apiModel,
-            providerId: provider.id,
-          }));
-        }
+      if (cfg.source === 'openrouter' && cfg.openrouterApiKey && cfg.openrouterModel) {
+        this.embeddingRegistry.register(new OpenRouterEmbeddingClient({
+          apiKey: cfg.openrouterApiKey,
+          model: cfg.openrouterModel,
+        }));
       } else if (cfg.source === 'local') {
         const modelId = cfg.localModelId ?? 'Xenova/multilingual-e5-small';
         if (!this.embeddingWorkerHost) {
