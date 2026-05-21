@@ -347,7 +347,6 @@ export function SettingsView() {
         <h3 style={{ margin: 0, marginBottom: '8px' }}>{t('settings.vector.heading')}</h3>
         <EmbeddingSection
           config={embeddingConfig}
-          providers={providers}
           coverage={coverage}
           modelDownloadState={embDlState}
           downloadProgress={embDlProgress}

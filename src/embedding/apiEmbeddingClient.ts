@@ -1,6 +1,9 @@
 import type { EmbeddingClient, EmbedOptions } from './types';
 
 const MAX_BATCH_COUNT = 96;
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const ATTRIBUTION_REFERER = 'https://github.com/david46liu/obsidian-knowledge-ai';
+const ATTRIBUTION_TITLE = 'Obsidian Knowledge AI';
 
 export class BatchTooLargeError extends Error {
   constructor(count: number) {
@@ -9,22 +12,17 @@ export class BatchTooLargeError extends Error {
   }
 }
 
-export interface APIEmbeddingClientConfig {
-  baseUrl: string;
+export interface OpenRouterEmbeddingClientConfig {
   apiKey: string;
   model: string;
-  providerId: string;
 }
 
-export class APIEmbeddingClient implements EmbeddingClient {
+export class OpenRouterEmbeddingClient implements EmbeddingClient {
   readonly modelId: string;
   readonly dimensions: number = 0;
 
-  private readonly normalizedBase: string;
-
-  constructor(private readonly cfg: APIEmbeddingClientConfig) {
-    this.modelId = `${cfg.providerId}/${cfg.model}`;
-    this.normalizedBase = cfg.baseUrl.replace(/\/v1$/, '');
+  constructor(private readonly cfg: OpenRouterEmbeddingClientConfig) {
+    this.modelId = `openrouter/${cfg.model}`;
   }
 
   async embedDocuments(texts: string[], opts?: EmbedOptions): Promise<number[][]> {
@@ -38,11 +36,14 @@ export class APIEmbeddingClient implements EmbeddingClient {
   }
 
   private async callAPI(texts: string[], opts?: EmbedOptions): Promise<number[][]> {
-    const res = await fetch(`${this.normalizedBase}/v1/embeddings`, {
+    const res = await fetch(`${OPENROUTER_BASE_URL}/embeddings`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.cfg.apiKey}`,
         'Content-Type': 'application/json',
+        // OpenRouter attribution headers (optional but recommended)
+        'HTTP-Referer': ATTRIBUTION_REFERER,
+        'X-Title': ATTRIBUTION_TITLE,
       },
       body: JSON.stringify({ model: this.cfg.model, input: texts }),
       signal: opts?.signal,
@@ -50,7 +51,7 @@ export class APIEmbeddingClient implements EmbeddingClient {
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`Embedding API error ${res.status}: ${body}`);
+      throw new Error(`OpenRouter embedding error ${res.status}: ${body}`);
     }
 
     const json = await res.json() as { data: Array<{ index: number; embedding: number[] }> };

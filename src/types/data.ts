@@ -211,9 +211,11 @@ export interface SearchOptions {
 
 export interface EmbeddingConfig {
   enabled: boolean;
-  source: 'api' | 'local';
-  apiProviderId?: string;
-  apiModel?: string;
+  source: 'openrouter' | 'local';
+  /** OpenRouter API key (sk-or-…). Stored in plugin data; only sent to https://openrouter.ai. */
+  openrouterApiKey?: string;
+  /** OpenRouter model slug, e.g. 'mistralai/mistral-embed'. */
+  openrouterModel?: string;
   localModelId?: string;
 }
 
