@@ -1,7 +1,5 @@
 # Knowledge AI — Usage guide
 
-[简体中文](./USAGE.zh-CN.md) · English
-
 This guide covers everything beyond the quick-start in the [README](../README.md): per-feature settings, what to do when something feels slow, and how the retrieval pipeline actually picks chunks.
 
 ## Notebooks

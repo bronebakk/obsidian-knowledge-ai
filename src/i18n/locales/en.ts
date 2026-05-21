@@ -48,9 +48,6 @@ const en: Record<string, string> = {
 
   // ─── Settings - top level ────────────────────────────────────────────
   'settings.heading': 'Knowledge AI Settings',
-  'settings.language': 'Language',
-  'settings.languageDesc': 'UI display language. Takes effect on the next reload.',
-  'settings.languageChangedReloadRequired': 'Language saved. Reload Obsidian to apply.',
 
   // ─── Settings - Providers ────────────────────────────────────────────
   'settings.providers.heading': 'Providers',

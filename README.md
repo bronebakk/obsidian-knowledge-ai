@@ -1,7 +1,5 @@
 # Knowledge AI for Obsidian
 
-[简体中文](./README.zh-CN.md) · English
-
 An AI assistant for your Obsidian vault: ask questions and get cited answers grounded in your notes, generate study guides / timelines / mind maps / slide decks from any folder.
 
 Inspired by Google NotebookLM but fully local-first and provider-agnostic — bring your own API key, or run embeddings entirely on-device.

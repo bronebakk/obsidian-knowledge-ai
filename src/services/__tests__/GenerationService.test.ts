@@ -149,7 +149,7 @@ describe('GenerationService', () => {
       expect(done.artifact.modelUsed).toBe('m-1');
       expect(done.artifact.notebookId).toBe('nb1');
       expect(done.artifact.generatedAt).toBe(1000);
-      expect(done.artifact.title).toBe('核心摘要');
+      expect(done.artifact.title).toBe('Summary');
       expect(done.artifact.truncated).toBeUndefined();
     }
   });
@@ -182,7 +182,7 @@ describe('GenerationService', () => {
     const events = await collect(svc.generate('nb1', 'summary'));
     const errs = events.filter(e => e.type === 'error');
     expect(errs).toHaveLength(1);
-    expect(errs[0].type === 'error' && errs[0].error).toMatch(/为空或未索引/);
+    expect(errs[0].type === 'error' && errs[0].error).toMatch(/empty or has not been indexed/);
     expect(events.some(e => e.type === 'done')).toBe(false);
   });
 
@@ -202,7 +202,7 @@ describe('GenerationService', () => {
     const events = await collect(svc.generate('nb1', 'summary'));
     const errs = events.filter(e => e.type === 'error');
     expect(errs).toHaveLength(1);
-    expect(errs[0].type === 'error' && errs[0].error).toMatch(/未配置/);
+    expect(errs[0].type === 'error' && errs[0].error).toMatch(/No model assigned/);
     expect(events.some(e => e.type === 'done')).toBe(false);
   });
 
@@ -263,7 +263,7 @@ describe('GenerationService', () => {
     expect(events.some(e => e.type === 'done')).toBe(false);
   });
 
-  it('emits error "已取消" and no done when signal aborted mid-stream', async () => {
+  it('emits error "Cancelled" and no done when signal aborted mid-stream', async () => {
     const chunks = [mkChunk('hA:0', 'alpha', { fileHash: 'hA' })];
     const pathMap = mkPathMapStub([
       { filePath: 'notes/a.md', fileHash: 'hA', sourceMtime: 1, observedAt: 1 },
@@ -292,7 +292,7 @@ describe('GenerationService', () => {
     expect(events.some(e => e.type === 'done')).toBe(false);
     const errs = events.filter(e => e.type === 'error');
     expect(errs).toHaveLength(1);
-    expect(errs[0].type === 'error' && errs[0].error).toBe('已取消');
+    expect(errs[0].type === 'error' && errs[0].error).toBe('Cancelled');
     // 第一个 token 应该被记录
     const tokens = events.filter(e => e.type === 'token');
     expect(tokens).toHaveLength(1);
@@ -491,17 +491,17 @@ describe('GenerationService', () => {
     const msgs = capturedMessages[0];
     expect(msgs).toHaveLength(2);
     expect(msgs[0].role).toBe('system');
-    expect(msgs[1]).toEqual({ role: 'user', content: '请基于上述资料生成。' });
+    expect(msgs[1]).toEqual({ role: 'user', content: 'Generate based on the materials above.' });
     const sys = msgs[0].content;
-    // 包含 generator 的 systemPrompt(study-guide)
-    expect(sys).toContain('学习指南生成器');
-    // 包含资料标头
-    expect(sys).toContain('== 资料 ==');
-    // [1] 行格式: [1] Topic A > Sub — notes/a.md
+    // generator system prompt (study-guide)
+    expect(sys).toContain('study-guide generator');
+    // materials header
+    expect(sys).toContain('== Materials ==');
+    // [1] row format: [1] Topic A > Sub — notes/a.md
     expect(sys).toContain('[1] Topic A > Sub — notes/a.md');
     expect(sys).toContain('first body');
-    // [2] 无 heading 用占位
-    expect(sys).toContain('[2] (无标题) — notes/b.md');
+    // [2] placeholder for missing heading
+    expect(sys).toContain('[2] (no title) — notes/b.md');
     expect(sys).toContain('second body');
   });
 
@@ -560,17 +560,17 @@ describe('GenerationService', () => {
       clock: makeFakeClock(1),
     });
     // 自定义 title
-    const evs1 = await collect(svc.generate('nb1', 'faq', { title: '  我的 FAQ  ' }));
+    const evs1 = await collect(svc.generate('nb1', 'faq', { title: '  My FAQ  ' }));
     const done1 = evs1.find(e => e.type === 'done');
     if (done1 && done1.type === 'done') {
-      expect(done1.artifact.title).toBe('我的 FAQ');
+      expect(done1.artifact.title).toBe('My FAQ');
       expect(done1.artifact.kind).toBe('faq');
     }
     // 空 title fallback 到 defaultTitle
     const evs2 = await collect(svc.generate('nb1', 'briefing', { title: '   ' }));
     const done2 = evs2.find(e => e.type === 'done');
     if (done2 && done2.type === 'done') {
-      expect(done2.artifact.title).toBe('执行简报');
+      expect(done2.artifact.title).toBe('Briefing');
     }
   });
 });

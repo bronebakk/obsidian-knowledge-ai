@@ -29,19 +29,19 @@ const RRF_K = 60;
 const SUMMARY_SEARCH_K = 50;
 const SUMMARY_PER_DOC = 1;
 const SUMMARY_DOC_LIMIT = 25;
-const SUMMARY_KEYWORDS = /总结|汇总|盘点|概览|全貌|罗列|列出|亮点|要点|重点|有哪些|有什么|有几个|都做了|做了什么|进展如何|整体情况/;
+const SUMMARY_KEYWORDS = /\b(summari[sz]e|summary|overview|recap|outline|highlights?|key points?|main points?|all of (?:the|my)|what (?:are|were) (?:the|all)|how many|what's the overall|gist|big picture)\b/i;
 
 const QUERY_EXPANSION_SYSTEM_PROMPT = [
-  '你是一个检索查询改写助手。',
-  '把用户的问题改写成 2-3 个不同角度的检索查询，覆盖同义词、子主题、相关概念。',
-  '严格输出 JSON 数组，例如：["改写1","改写2","改写3"]。',
-  '不要解释，不要 markdown 代码块，不要其他任何字符。',
+  'You are a retrieval query rewriter.',
+  'Rewrite the user\'s question into 2-3 alternative search queries that cover synonyms, sub-topics, and related concepts.',
+  'Output strictly a JSON array, for example: ["rewrite 1","rewrite 2","rewrite 3"].',
+  'No explanation, no markdown code block, no other characters.',
 ].join('\n');
 
 const DEFAULT_SYSTEM_PROMPT = [
-  '你是基于用户笔记的智能助手。',
-  '请仅根据下方提供的资料回答问题,并在引用资料时使用 [N] 编号。',
-  '若资料中未涉及问题,明确告知"资料中未提及",不要编造。',
+  'You are an AI assistant grounded in the user\'s notes.',
+  'Answer questions using only the materials provided below; cite with [N] numbers when referencing them.',
+  'If the materials do not cover the question, say "Not mentioned in the materials" — do not fabricate.',
 ].join('\n');
 
 export interface ResolvedTaskClient {
@@ -164,7 +164,7 @@ export class ChatService {
 
       const resolved = this.deps.resolveTaskClient();
       if (!resolved) {
-        yield { type: 'error', error: '未配置 chat 任务的模型;请到设置页指派' };
+        yield { type: 'error', error: 'No model assigned for the chat task. Open settings to assign one.' };
         return;
       }
       resolvedModel = resolved.model;
@@ -383,12 +383,12 @@ export class ChatService {
     history: ChatTurn[],
     userText: string
   ): ChatMessage[] {
-    const lines: string[] = [systemPrompt, '', '== 资料 =='];
+    const lines: string[] = [systemPrompt, '', '== Materials =='];
     let budget = MAX_CONTEXT_TOKENS;
     for (let i = 0; i < hits.length; i++) {
       const c = citations[i];
       const chunk = hits[i].chunk;
-      const block = `[${c.index}] ${c.headingPath.join(' > ') || '(无标题)'} — ${c.filePath}\n${chunk.content}\n`;
+      const block = `[${c.index}] ${c.headingPath.join(' > ') || '(no title)'} — ${c.filePath}\n${chunk.content}\n`;
       const estTokens = chunk.tokenCount + 30;
       if (estTokens > budget && i > 0) break;
       lines.push(block);

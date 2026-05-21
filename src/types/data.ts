@@ -237,8 +237,8 @@ export interface PluginData {
   };
   ui?: {
     activeNotebookId?: NotebookId;
-    /** Persisted locale. If unset, falls back to Obsidian's moment.locale() then 'en'. */
-    locale?: 'en' | 'zh-CN';
+    /** @deprecated locale picker was removed when the Chinese locale was dropped; kept for legacy data compatibility. */
+    locale?: string;
   };
   embeddingConfig?: EmbeddingConfig;
   imageConfig?: ImageConfig;

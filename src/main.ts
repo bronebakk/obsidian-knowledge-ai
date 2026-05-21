@@ -47,7 +47,7 @@ import { LocalEmbeddingClient } from 'src/embedding/localEmbeddingClient';
 import { VectorStore } from 'src/embedding/vectorStore';
 import { invalidateAllEmbeddings } from 'src/services/IndexService';
 import { useNotebookAIStore, PluginServicesContext, type PluginServices } from 'src/ui/hooks/useStore';
-import { setLocale, resolveDefaultLocale, t } from 'src/i18n';
+import { t } from 'src/i18n';
 
 import { App } from 'src/ui/App';
 import { ChatView } from 'src/ui/views/ChatView';
@@ -169,10 +169,6 @@ export default class NotebookAIPlugin extends Plugin {
     stage('4. notebookService.loadAll');
 
     const pluginData = this.notebookService.getPluginData();
-
-    // Initialize i18n as early as possible — every subsequent registration
-    // (commands, ribbon labels, settings) reads strings through t().
-    setLocale(resolveDefaultLocale(pluginData.ui?.locale));
 
     // ── 5. HashCache + PathMap 加载 ──────────────────────────
     // 这两个并行加载;hashCache 对大库可达 100+ MB,串行加载浪费 I/O。
@@ -741,15 +737,6 @@ export default class NotebookAIPlugin extends Plugin {
         return { cancel: () => ctrl.abort(), promise };
       },
       getSummaryCoverage: (notebookId) => this.summaryService.coverage(notebookId),
-      setLocale: async (locale) => {
-        const cur = this.notebookService.getPluginData();
-        await this.notebookService.savePluginData({
-          ...cur,
-          ui: { ...(cur.ui ?? {}), locale },
-        });
-        setLocale(locale);
-        new Notice(t('settings.languageChangedReloadRequired'));
-      },
       getEmbeddingCoverage: () => {
         const currentModelId = this.embeddingRegistry.get()?.modelId;
         let total = 0;
