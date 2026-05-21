@@ -3,9 +3,9 @@ import type { SearchHit } from 'src/types/data';
 import type { Reranker } from 'src/retrieval/types';
 
 const SYSTEM_PROMPT = [
-  '你是检索相关性评分器。',
-  '针对用户问题,判断每段笔记的相关性。',
-  '输出 JSON 数组,按相关性降序,给出所有候选的序号(index,即用户消息中 [N] 的 N)和 0-10 评分。',
+  'You are a retrieval relevance scorer.',
+  'For the user\'s question, judge how relevant each note candidate is.',
+  'Output a JSON array sorted by relevance descending, with every candidate\'s index (the N from [N] in the user message) and a 0-10 score.',
 ].join('\n');
 
 const MAX_CONTENT_CHARS = 300;
@@ -21,16 +21,16 @@ export class LLMReranker implements Reranker {
   async rerank(query: string, candidates: SearchHit[]): Promise<SearchHit[]> {
     if (candidates.length === 0) return [];
 
-    const userLines: string[] = [`问题:${query}`, '候选:'];
+    const userLines: string[] = [`Question: ${query}`, 'Candidates:'];
     candidates.forEach((c, i) => {
       const truncated = c.chunk.content.length > MAX_CONTENT_CHARS
         ? c.chunk.content.slice(0, MAX_CONTENT_CHARS) + '…'
         : c.chunk.content;
-      userLines.push(`[${i + 1}] 标题: ${c.chunk.headingText || '(无)'}`);
-      userLines.push(`    内容: ${truncated}`);
+      userLines.push(`[${i + 1}] Heading: ${c.chunk.headingText || '(none)'}`);
+      userLines.push(`    Content: ${truncated}`);
     });
     userLines.push('');
-    userLines.push('返回严格 JSON:{"rankings":[{"index":N,"score":0-10}, ...]}');
+    userLines.push('Return strict JSON: {"rankings":[{"index":N,"score":0-10}, ...]}');
 
     const messages: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },

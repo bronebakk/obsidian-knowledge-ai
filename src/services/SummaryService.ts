@@ -20,10 +20,10 @@ const RETRY_BASE_MS = 1500;
 const RETRY_MAX_MS = 20000;
 
 const SUMMARY_SYSTEM_PROMPT = [
-  '你是文档摘要专家。',
-  '请用 200 字以内总结这份文档的核心内容、关键论断、关键结论、要点。',
-  '聚焦事实信息和实质内容,忽略格式细节、页眉页脚、署名等。',
-  '直接输出摘要正文,不要加「摘要:」「以下是摘要:」等前缀。',
+  'You are a document summarizer.',
+  'Summarize the document\'s core content, key claims, key conclusions, and main points in 200 words or fewer.',
+  'Focus on factual and substantive content; ignore formatting details, headers / footers, signatures, etc.',
+  'Output the summary body directly — do not add prefixes like "Summary:" or "Here is the summary:".',
 ].join('\n');
 
 export interface SummaryProgress {
@@ -126,7 +126,7 @@ export class SummaryService {
     const notebook = await this.deps.getNotebook(notebookId);
     if (!notebook) throw new Error(`notebook not found: ${notebookId}`);
     const resolved = this.deps.resolveSummaryClient();
-    if (!resolved) throw new Error('summary 任务未配置 LLM provider');
+    if (!resolved) throw new Error('No LLM provider configured for the summary task');
 
     // 先按"未生成 summary"过滤,然后再筛掉"没有可摘要内容"(扫描版 PDF / 空 docx /
      // 仅含图片的文档等)。后者由 LLM 也无能为力,作为 skipped 单独计,不计 failed。
@@ -270,7 +270,7 @@ export class SummaryService {
         });
         const text = result.content.trim();
         if (!text) {
-          throw new Error(`LLM returned empty content (model=${model}, input=${content.length} chars) — 该模型可能未把答案放在 message.content 里,建议换一个普通 chat 模型`);
+          throw new Error(`LLM returned empty content (model=${model}, input=${content.length} chars) — this model may not place its answer in message.content; try a standard chat model instead`);
         }
         return text;
       } catch (e) {

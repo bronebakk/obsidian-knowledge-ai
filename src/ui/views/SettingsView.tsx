@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Provider, Source, Notebook, NotebookId } from 'src/types/data';
 import { useNotebookAIStore } from 'src/ui/hooks/useStore';
 import { usePluginServices } from 'src/ui/hooks/useStore';
-import { t, getLocale, AVAILABLE_LOCALES, type Locale } from 'src/i18n';
+import { t } from 'src/i18n';
 import { EmbeddingSection, type VectorCoverage } from 'src/ui/components/EmbeddingSection';
 import { ImageSection } from 'src/ui/components/ImageSection';
 import { ProviderCard } from 'src/ui/components/ProviderCard';
@@ -509,28 +509,6 @@ export function SettingsView() {
         </div>
       </div>
 
-      {/* Section 6: Language picker (always at the bottom so reload-required note is near it) */}
-      <div style={{ marginTop: '16px' }}>
-        <div className="setting-item">
-          <div className="setting-item-info">
-            <div className="setting-item-name">{t('settings.language')}</div>
-            <div className="setting-item-description">{t('settings.languageDesc')}</div>
-          </div>
-          <div className="setting-item-control">
-            <select
-              value={getLocale()}
-              onChange={async (e) => {
-                const next = e.target.value as Locale;
-                await services.setLocale?.(next);
-              }}
-            >
-              {AVAILABLE_LOCALES.map(l => (
-                <option key={l.value} value={l.value}>{l.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

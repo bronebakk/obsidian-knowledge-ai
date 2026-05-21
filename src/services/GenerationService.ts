@@ -78,13 +78,13 @@ export class GenerationService {
 
       const chunks = this.collectNotebookChunks(notebook);
       if (chunks.length === 0) {
-        yield { type: 'error', error: 'Notebook 为空或未索引,请先索引' };
+        yield { type: 'error', error: 'Notebook is empty or has not been indexed. Index it first.' };
         return;
       }
 
       const resolved = this.deps.resolveTaskClient();
       if (!resolved) {
-        yield { type: 'error', error: '未配置 summary 任务的模型;请到设置页指派' };
+        yield { type: 'error', error: 'No model assigned for the summary task. Open settings to assign one.' };
         return;
       }
       resolvedModel = resolved.model;
@@ -107,7 +107,7 @@ export class GenerationService {
       for await (const ev of stream) {
         if (signal?.aborted) {
           // 取消不持久化 artifact;走 error 路径
-          yield { type: 'error', error: '已取消' };
+          yield { type: 'error', error: 'Cancelled' };
           return;
         }
         if (ev.type === 'error') {
@@ -135,7 +135,7 @@ export class GenerationService {
     } catch (e) {
       // 如果是因 abort 抛出(fetch/AbortError),统一转为"已取消"
       if (signal?.aborted) {
-        yield { type: 'error', error: '已取消' };
+        yield { type: 'error', error: 'Cancelled' };
         return;
       }
       if (e instanceof TokenLimitError) {
@@ -207,17 +207,17 @@ export class GenerationService {
     citations: Citation[],
     chunks: Chunk[]
   ): ChatMessage[] {
-    const lines: string[] = [systemPrompt, '', '== 资料 =='];
+    const lines: string[] = [systemPrompt, '', '== Materials =='];
     for (let i = 0; i < chunks.length; i++) {
       const c = citations[i];
       const chunk = chunks[i];
-      lines.push(`[${c.index}] ${c.headingPath.join(' > ') || '(无标题)'} — ${c.filePath}`);
+      lines.push(`[${c.index}] ${c.headingPath.join(' > ') || '(no title)'} — ${c.filePath}`);
       lines.push(chunk.content);
       lines.push('');
     }
     return [
       { role: 'system', content: lines.join('\n') },
-      { role: 'user', content: '请基于上述资料生成。' },
+      { role: 'user', content: 'Generate based on the materials above.' },
     ];
   }
 }

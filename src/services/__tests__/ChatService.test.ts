@@ -127,7 +127,7 @@ describe('ChatService', () => {
     const events = await collect(svc.ask('nb1', [], 'q'));
     const errs = events.filter(e => e.type === 'error');
     expect(errs).toHaveLength(1);
-    expect(errs[0].type === 'error' && errs[0].error).toMatch(/未配置/);
+    expect(errs[0].type === 'error' && errs[0].error).toMatch(/No model assigned/);
     expect(events.some(e => e.type === 'done')).toBe(false);
   });
 
@@ -266,7 +266,7 @@ describe('ChatService', () => {
     });
     await collect(svc.ask('nb1', [], 'q'));
     const sys = capturedMessages[0][0].content;
-    expect(sys).toContain('基于用户笔记的智能助手');
+    expect(sys).toContain('AI assistant grounded in the user');
     expect(sys).toContain('[N]');
   });
 
@@ -280,6 +280,6 @@ describe('ChatService', () => {
     });
     await collect(svc.ask('nb1', [], 'q'));
     const sys = capturedMessages[0][0].content;
-    expect(sys).toContain('基于用户笔记的智能助手');
+    expect(sys).toContain('AI assistant grounded in the user');
   });
 });
