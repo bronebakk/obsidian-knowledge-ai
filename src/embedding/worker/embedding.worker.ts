@@ -2,7 +2,8 @@
 // Runs @xenova/transformers pipeline without blocking the main thread.
 
 declare const self: {
-  addEventListener(type: 'message' | 'error' | 'unhandledrejection', listener: (evt: unknown) => void): void;
+  addEventListener<T = unknown>(type: 'message', listener: (evt: MessageEvent<T>) => void | Promise<void>): void;
+  addEventListener(type: 'error' | 'unhandledrejection', listener: (evt: unknown) => void): void;
   postMessage(data: unknown): void;
   onerror?: ((evt: unknown) => void) | null;
 };
@@ -91,7 +92,7 @@ function l2normalize(vec: number[]): number[] {
   return vec.map(v => v / norm);
 }
 
-self.addEventListener('message', async (evt: MessageEvent<EmbedRequest>) => {
+self.addEventListener<EmbedRequest>('message', async (evt) => {
   const msg = evt.data;
 
   if (msg.type === 'init') {
